@@ -1,0 +1,36 @@
+{
+  "name": "ClassTrack",
+  "short_name": "ClassTrack",
+  "description": "Academic schedule tracking for students and class representatives",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d14",
+  "theme_color": "#0f1117",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/?page=dashboard",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Schedule",
+      "url": "/?page=schedule",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

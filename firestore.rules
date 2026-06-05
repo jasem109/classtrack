@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+    function isCR() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cr';
+    }
+    function isCRForBatch(batchId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cr' &&
+        batchId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.managedBatches;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Batches
+    match /batches/{batchId} {
+      allow read: if isSignedIn();
+      allow create: if isCR();
+      allow update: if isCRForBatch(batchId);
+      allow delete: if isCRForBatch(batchId);
+    }
+
+    // Courses
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCR();
+    }
+
+    // Classes (schedule entries)
+    match /classes/{classId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCR();
+    }
+
+    // Tests
+    match /tests/{testId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCR();
+    }
+
+    // Assignments
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCR();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isCR();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // FCM tokens
+    match /fcmTokens/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // CR Applications
+    match /crApplications/{appId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isCR());
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+  }
+}
