@@ -2,31 +2,35 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    function isOwner(uid) {
-      return request.auth.uid == uid;
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return request.auth.uid == uid; }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     function isCR() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cr';
+      return isSignedIn() && userDoc().role == 'cr';
     }
     function isCRForBatch(batchId) {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cr' &&
-        batchId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.managedBatches;
+      return isCR() && batchId in userDoc().managedBatches;
+    }
+    function isCRForIncoming() {
+      return isCR() && request.resource.data.batchId in userDoc().managedBatches;
+    }
+    function isCRForResource() {
+      return isCR() && resource.data.batchId in userDoc().managedBatches;
     }
 
-    // Users collection
+    // ── USERS ──────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      // Owner can update own doc; CR can update enrolledBatches (approve flow)
+      allow update: if isOwner(userId) || (isSignedIn() && isCR());
       allow delete: if false;
     }
 
-    // Batches
+    // ── BATCHES ────────────────────────────────────────────────
     match /batches/{batchId} {
       allow read: if isSignedIn();
       allow create: if isCR();
@@ -34,48 +38,61 @@ service cloud.firestore {
       allow delete: if isCRForBatch(batchId);
     }
 
-    // Courses
-    match /courses/{courseId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isCR();
-    }
-
-    // Classes (schedule entries)
+    // ── CLASSES ────────────────────────────────────────────────
     match /classes/{classId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isCR();
+      allow create: if isCRForIncoming();
+      allow update: if isCRForIncoming() || isCRForResource();
+      allow delete: if isCRForResource();
     }
 
-    // Tests
+    // ── TESTS ──────────────────────────────────────────────────
     match /tests/{testId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isCR();
+      allow create: if isCRForIncoming();
+      allow update: if isCRForIncoming() || isCRForResource();
+      allow delete: if isCRForResource();
     }
 
-    // Assignments
+    // ── ASSIGNMENTS ────────────────────────────────────────────
     match /assignments/{assignmentId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isCR();
+      allow create: if isCRForIncoming();
+      allow update: if isCRForIncoming() || isCRForResource();
+      allow delete: if isCRForResource();
     }
 
-    // Notifications
+    // ── ENROLLMENT REQUESTS ────────────────────────────────────
+    // KEY FIX: list/query ops can't use resource.data — allow reads
+    // for signed-in users and rely on query filters in the app.
+    match /enrollmentRequests/{reqId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.uid == request.auth.uid || isCR()
+      );
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ── NOTIFICATIONS ──────────────────────────────────────────
+    // Any signed-in user can create (students → CR, CR → students)
+    // Only the recipient reads/updates their own
     match /notifications/{notifId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isCR();
+      allow read:   if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow delete: if false;
     }
 
-    // FCM tokens
+    // ── FCM TOKENS ─────────────────────────────────────────────
     match /fcmTokens/{userId} {
       allow read, write: if isOwner(userId);
     }
 
-    // CR Applications
-    match /crApplications/{appId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isCR());
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+    // ── COURSES ────────────────────────────────────────────────
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCR();
     }
   }
 }

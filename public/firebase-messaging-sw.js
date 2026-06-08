@@ -1,16 +1,16 @@
-// firebase-messaging-sw.js — must be at root for FCM to work
+// firebase-messaging-sw.js
+// Handles background push notifications when the app is closed
+
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
-// IMPORTANT: Replace with your actual Firebase config
 firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID"
+  apiKey: "AIzaSyDtUbSlCxFlyfDG6_-O-81BCZhg8nBn6po",
+  authDomain: "myweb-8702b.firebaseapp.com",
+  projectId: "myweb-8702b",
+  storageBucket: "myweb-8702b.firebasestorage.app",
+  messagingSenderId: "962539939915",
+  appId: "1:962539939915:web:62eb6fc672cc6a9f9bc5ce"
 });
 
 const messaging = firebase.messaging();
@@ -21,23 +21,23 @@ messaging.onBackgroundMessage((payload) => {
 
   const { title, body } = payload.notification || {};
   const notifTitle = title || 'ClassTrack';
-  const notifOptions = {
-    body: body || '',
-    icon: './icons/icon-192.png',
-    badge: '/icons/badge-72.png',
-    vibrate: [200, 100, 200],
+  const notifBody  = body  || 'You have a new notification';
+
+  self.registration.showNotification(notifTitle, {
+    body: notifBody,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: 'classtrack-notif',
     requireInteraction: true,
-    data: payload.data || {},
+    data: { url: '/index.html' },
     actions: [
-      { action: 'view', title: 'View' },
+      { action: 'open', title: 'Open ClassTrack' },
       { action: 'dismiss', title: 'Dismiss' }
     ]
-  };
-
-  self.registration.showNotification(notifTitle, notifOptions);
+  });
 });
 
-// Notification click
+// Click on notification opens the app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   if (event.action === 'dismiss') return;
@@ -45,11 +45,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if (client.url.includes('classtrack') || client.url.includes('myweb-8702b')) {
           return client.focus();
         }
       }
-      if (clients.openWindow) return clients.openWindow('/');
+      return clients.openWindow('/index.html');
     })
   );
 });
